@@ -1,21 +1,34 @@
 package com.project;
 
+import java.net.URL;
+
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 public class Main extends Application {
 
     @Override
-    public void start(Stage primaryStage) throws Exception {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main_view.fxml"));
-        Scene scene = new Scene(loader.load(), 800, 600);
+    public void start(Stage stage) throws Exception {
+        URL fxmlLocation = getClass().getResource("/assets/layout.fxml");
+        
+        if (fxmlLocation == null) {
+            System.err.println("ERROR CRÍTIC: No s'ha trobat el fitxer /assets/layout.fxml dins de src/main/resources!");
+            return;
+        }
 
-        primaryStage.setTitle("Nintendo DB");
-        primaryStage.setScene(scene);
-        primaryStage.setMinWidth(350); // Mida mínima per a la vista mòbil
-        primaryStage.show();
+        FXMLLoader loader = new FXMLLoader(fxmlLocation);
+        Parent root = loader.load();
+
+        Scene scene = new Scene(root, 750, 500);
+
+        stage.setScene(scene);
+        stage.setTitle("Nintendo DB");
+        stage.setMinWidth(320);
+        stage.setMinHeight(400);
+        stage.show();
     }
 
     public static void main(String[] args) {

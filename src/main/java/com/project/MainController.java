@@ -1,9 +1,19 @@
 package com.project;
 
 import java.io.InputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ResourceBundle;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
+import javafx.fxml.FXMLLoader;
+import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
@@ -12,12 +22,11 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-public class MainController {
+public class MainController implements Initializable {
 
     @FXML private BorderPane rootPane;
     @FXML private HBox desktopView;
     @FXML private VBox mobileView;
-
     @FXML private ComboBox<String> cmbCategory;
     @FXML private VBox vboxList;
 
@@ -25,80 +34,148 @@ public class MainController {
     @FXML private Label lblTitle;
     @FXML private Label lblDescription;
 
-    // Amplada límit per fer el canvi entre mòbil i escriptori
-    private static final double MOBILE_BREAKPOINT = 550.0;
+    @Override
+    public void initialize(URL url, ResourceBundle rb) {
+        // Configurar selector de categorías
+        cmbCategory.getItems().addAll("Jocs", "Personatges", "Consoles");
+
+        cmbCategory.setOnAction(e -> {
+            String selected = cmbCategory.getValue();
+            if (selected != null) {
+                loadCategoryData(selected);
+            }
+        });
+
+        // Cambio adaptativo en función del ancho
+        rootPane.widthProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal.doubleValue() < 600) {
+                desktopView.setVisible(false);
+                desktopView.setManaged(false);
+                mobileView.setVisible(true);
+                mobileView.setManaged(true);
+            } else {
+                desktopView.setVisible(true);
+                desktopView.setManaged(true);
+                mobileView.setVisible(false);
+                mobileView.setManaged(false);
+            }
+        });
+
+        // Selección por defecto
+        cmbCategory.getSelectionModel().select("Jocs");
+    }
 
     @FXML
-    public void initialize() {
-        // 1. Configuració inicial del ComboBox
-        cmbCategory.getItems().addAll("Jocs", "Personatges", "Consoles");
-        cmbCategory.getSelectionModel().select("Jocs");
-
-        // 2. Control d'estat responsive (Adaptatiu)
-        rootPane.widthProperty().addListener((obs, oldVal, newVal) -> {
-            updateLayout(newVal.doubleValue());
-        });
-
-        // 3. Carregar dades d'exemple / llegides del JSON
-        loadItems();
-    }
-
-    private void updateLayout(double width) {
-        boolean isMobile = width < MOBILE_BREAKPOINT;
-
-        // Amaga/Mostra i ajusta la gestió de l'espai
-        desktopView.setVisible(!isMobile);
-        desktopView.setManaged(!isMobile);
-
-        mobileView.setVisible(isMobile);
-        mobileView.setManaged(isMobile);
-    }
-
-    private void loadItems() {
-        // Neteja la llista actual
-        vboxList.getChildren().clear();
-
-        // Exemple d'element carregat (en cas real es llegeix des de data.json)
-        addListItem("Pokémon Red i Blue", 
-                    "/assets/images/pokemon.jpg", 
-                    "Pokémon és una sèrie de jocs on els jugadors capturen i entrenen criatures conegudes com a Pokémon...");
+    private void onMobileCategoryClick(ActionEvent event) {
+        Button btn = (Button) event.getSource();
+        String category = btn.getText();
         
-        addListItem("Super Mario Bros", 
-                    "/assets/images/mario.jpg", 
-                    "Un dels jocs de plataformes més iconics de la historia de Nintendo.");
+        cmbCategory.getSelectionModel().select(category);
+
+        // Cambiar a vista escritorio para ver los detalles cargados
+        desktopView.setVisible(true);
+        desktopView.setManaged(true);
+        mobileView.setVisible(false);
+        mobileView.setManaged(false);
     }
 
-    private void addListItem(String title, String imagePath, String description) {
-        HBox itemBox = new HBox(10);
-        itemBox.setAlignment(Pos.CENTER_LEFT);
-        itemBox.setStyle("-fx-padding: 8px; -fx-background-color: #F0F0F0; -fx-background-radius: 5px; -fx-cursor: hand;");
+    private void loadCategoryData(String category) {
+        vboxList.getChildren().clear();
+        String jsonPath = "";
 
-        // Miniatura
-        ImageView thumb = new ImageView();
-        thumb.setFitWidth(40);
-        thumb.setFitHeight(40);
-        thumb.setPreserveRatio(true);
+        switch (category) {
+            case "Personatges":
+                jsonPath = "/assets/characters.json";
+                break;
+            case "Consoles":
+                jsonPath = "/assets/consoles.json";
+                break;
+            case "Jocs":
+            default:
+                jsonPath = "/assets/games.json";
+                break;
+        }
 
-        try {
-            InputStream is = getClass().getResourceAsStream(imagePath);
-            if (is != null) thumb.setImage(new Image(is));
-        } catch (Exception ignored) {}
+        try (InputStream is = getClass().getResourceAsStream(jsonPath)) {
+            if (is == null) {
+                System.err.println("No s'ha trobat l'arxiu: " + jsonPath);
+                return;
+            }
 
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            JSONArray jsonArray = new JSONArray(content);
 
-        itemBox.getChildren().addAll(thumb, titleLabel);
+            URL resource = getClass().getResource("/assets/listItem.fxml");
 
-        // Al fer clic sobre l'ítem de la llista
-        itemBox.setOnMouseClicked(e -> {
-            lblTitle.setText(title);
-            lblDescription.setText(description);
-            try {
-                InputStream is = getClass().getResourceAsStream(imagePath);
-                if (is != null) imgDetail.setImage(new Image(is));
-            } catch (Exception ignored) {}
-        });
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject item = jsonArray.getJSONObject(i);
 
-        vboxList.getChildren().add(itemBox);
+                FXMLLoader loader = new FXMLLoader(resource);
+                Parent itemTemplate = loader.load();
+                ControllerListItem itemController = loader.getController();
+
+                String title = item.optString("name", "Sense títol");
+                String imageFile = item.optString("image", "");
+                String color = item.optString("color", "#1976D2");
+
+                String subtitle = "";
+                StringBuilder details = new StringBuilder();
+
+                if (category.equals("Jocs")) {
+                    subtitle = String.valueOf(item.optInt("year", 0));
+                    details.append("Tipus: ").append(item.optString("type", "-")).append("\n\n");
+                    details.append(item.optString("plot", "Sense descripció disponible."));
+
+                } else if (category.equals("Personatges")) {
+                    subtitle = item.optString("game", "");
+                    details.append("Joc principal: ").append(subtitle).append("\n");
+                    details.append("Color associat: ").append(color);
+
+                } else if (category.equals("Consoles")) {
+                    subtitle = item.optString("date", "");
+                    details.append("Data de llançament: ").append(subtitle).append("\n");
+                    details.append("Processador: ").append(item.optString("procesador", "-")).append("\n");
+                    details.append("Unitats venudes: ").append(String.format("%,d", item.optLong("units_sold", 0)));
+                }
+
+                itemController.setTitle(title);
+                itemController.setSubtitle(subtitle);
+                itemController.setImatge("/assets/images/" + imageFile);
+                itemController.setCircleColor(color);
+
+                // Evento al hacer clic en un elemento de la lista
+                final String finalDetails = details.toString();
+                final String finalImageFile = imageFile;
+                itemTemplate.setOnMouseClicked(e -> showDetail(title, finalDetails, finalImageFile));
+
+                vboxList.getChildren().add(itemTemplate);
+
+                // Mostrar el primer ítem por defecto
+                if (i == 0) {
+                    showDetail(title, details.toString(), imageFile);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showDetail(String title, String description, String imageFile) {
+        lblTitle.setText(title);
+        lblDescription.setText(description);
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            try (InputStream is = getClass().getResourceAsStream("/assets/images/" + imageFile)) {
+                if (is != null) {
+                    imgDetail.setImage(new Image(is));
+                } else {
+                    imgDetail.setImage(null);
+                }
+            } catch (Exception e) {
+                imgDetail.setImage(null);
+            }
+        } else {
+            imgDetail.setImage(null);
+        }
     }
 }
